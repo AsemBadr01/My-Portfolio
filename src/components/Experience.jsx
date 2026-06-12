@@ -2,13 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import gsap from 'gsap'
 import ScrollTrigger from 'gsap/ScrollTrigger'
 import ScrollToPlugin from 'gsap/ScrollToPlugin'
-import { CHAPTERS, chapterName } from '../constants/chapterData'
-import Chapter1 from './chapters/Chapter1'
-import Chapter2 from './chapters/Chapter2'
-import Chapter3 from './chapters/Chapter3'
-import Chapter4 from './chapters/Chapter4'
-import Chapter5 from './chapters/Chapter5'
-import Oracle from './Oracle'
+import { SECTIONS, sectionName } from '../constants/sectionData'
+import ParticleField from './ParticleField'
+import Hero from './sections/Hero'
+import About from './sections/About'
+import Skills from './sections/Skills'
+import Projects from './sections/Projects'
+import Journey from './sections/Journey'
+import Contact from './sections/Contact'
+import Echo from './Echo'
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin)
 
@@ -16,7 +18,7 @@ const ExpCtx = createContext(null)
 export const useExp = () => useContext(ExpCtx)
 
 export default function Experience() {
-  const [chapter, setChapter] = useState(1)
+  const [section, setSection] = useState(1)
   const [progress, setProgress] = useState(0)
   const [guided, setGuided] = useState(false)
   const wrapRef = useRef(null)
@@ -32,16 +34,16 @@ export default function Experience() {
     el.classList.add('go')
   }, [])
 
-  const goToChapter = useCallback(
+  const goToSection = useCallback(
     (n, { withFlash = true } = {}) => {
-      n = Math.max(1, Math.min(5, n))
+      n = Math.max(1, Math.min(6, n))
       if (withFlash) flash()
       const st = stRef.current
       if (st) {
-        const y = st.start + ((n - 1) / 4) * (st.end - st.start)
-        gsap.to(window, { scrollTo: y, duration: 1.5, ease: 'power2.inOut' })
+        const y = st.start + ((n - 1) / 5) * (st.end - st.start)
+        gsap.to(window, { scrollTo: y, duration: 1.4, ease: 'power3.inOut' })
       } else {
-        document.querySelector(`.chapter[data-ch="${n}"]`)?.scrollIntoView({ behavior: 'smooth' })
+        document.querySelector(`.sec[data-sec="${n}"]`)?.scrollIntoView({ behavior: 'smooth' })
       }
     },
     [flash]
@@ -59,37 +61,64 @@ export default function Experience() {
         scrollTrigger: {
           trigger: wrapRef.current,
           pin: true,
-          scrub: 1.5,
+          scrub: 1.2,
           end: () => '+=' + dist(),
           invalidateOnRefresh: true,
           onUpdate: (self) => {
             setProgress(self.progress)
-            const ch = Math.min(5, Math.floor(self.progress * 5) + 1)
-            setChapter((c) => (c === ch ? c : ch))
+            // switch active section at the midpoint of each panel transition
+            const s = Math.max(1, Math.min(6, Math.round(self.progress * 5) + 1))
+            setSection((c) => (c === s ? c : s))
           },
         },
       })
       stRef.current = tween.scrollTrigger
+
+      // parallax depth layers: decorative elements drift at their own speed
+      const plxTweens = gsap.utils.toArray('.plx').map((el) => {
+        const d = parseFloat(el.dataset.depth || 0.2)
+        return gsap.fromTo(
+          el,
+          { x: () => d * window.innerWidth },
+          {
+            x: () => -d * window.innerWidth,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: el,
+              containerAnimation: tween,
+              start: 'left right',
+              end: 'right left',
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
+          }
+        )
+      })
+
       return () => {
         stRef.current = null
+        plxTweens.forEach((t) => {
+          t.scrollTrigger?.kill()
+          t.kill()
+        })
         tween.scrollTrigger?.kill()
         tween.kill()
       }
     })
 
     mm.add('(max-width: 767px), (prefers-reduced-motion: reduce)', () => {
-      const sections = gsap.utils.toArray('.chapter')
+      const sections = gsap.utils.toArray('.sec')
       const obs = new IntersectionObserver(
         (entries) => {
           for (const e of entries) {
             if (e.isIntersecting) {
-              const n = Number(e.target.dataset.ch)
-              setChapter(n)
-              setProgress((n - 1) / 4)
+              const n = Number(e.target.dataset.sec)
+              setSection(n)
+              setProgress((n - 1) / 5)
             }
           }
         },
-        { threshold: 0.5 }
+        { threshold: 0.4 }
       )
       sections.forEach((s) => obs.observe(s))
       return () => obs.disconnect()
@@ -101,44 +130,60 @@ export default function Experience() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.key === 'ArrowRight') goToChapter(chapter + 1)
-      if (e.key === 'ArrowLeft') goToChapter(chapter - 1)
+      if (e.key === 'ArrowRight') goToSection(section + 1)
+      if (e.key === 'ArrowLeft') goToSection(section - 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [chapter, goToChapter])
+  }, [section, goToSection])
 
-  const ctx = { chapter, name: chapterName(chapter), goToChapter, guided, setGuided }
-  const accent = CHAPTERS[chapter - 1].accent
+  const ctx = { section, name: sectionName(section), goToSection, guided, setGuided }
+  const accent = SECTIONS[section - 1].accent
 
   return (
     <ExpCtx.Provider value={ctx}>
+      <ParticleField accent={accent} />
       <div className="flash" ref={flashRef} />
+
+      <header className="topnav" style={{ '--accent': accent }}>
+        <button className="brand" onClick={() => goToSection(1)} aria-label="Back to start">
+          AB<span>.</span>
+        </button>
+        <nav aria-label="Sections">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.n}
+              className={section === s.n ? 'on' : ''}
+              aria-current={section === s.n ? 'true' : undefined}
+              onClick={() => goToSection(s.n)}
+            >
+              {s.name}
+            </button>
+          ))}
+        </nav>
+      </header>
+
       <div className="gui" style={{ '--accent': accent }}>
         <div className="progress">
           <span style={{ width: `${progress * 100}%` }} />
         </div>
-        <div className="chcount">CHAPTER 0{chapter} / 05</div>
-        <div className="navarrows">
-          <button aria-label="Previous chapter" onClick={() => goToChapter(chapter - 1)}>←</button>
-          <button aria-label="Next chapter" onClick={() => goToChapter(chapter + 1)}>→</button>
-        </div>
         <button className={`tourtoggle${guided ? ' on' : ''}`} onClick={() => setGuided((g) => !g)}>
-          GUIDED TOUR
+          ✦ GUIDED TOUR
         </button>
       </div>
 
       <div className="hwrap" ref={wrapRef} style={{ '--accent': accent }}>
         <div className="track" ref={trackRef}>
-          <Chapter1 active={chapter === 1} />
-          <Chapter2 active={chapter === 2} />
-          <Chapter3 active={chapter === 3} />
-          <Chapter4 active={chapter === 4} />
-          <Chapter5 active={chapter === 5} />
+          <Hero active={section === 1} />
+          <About active={section === 2} />
+          <Skills active={section === 3} />
+          <Projects active={section === 4} />
+          <Journey active={section === 5} />
+          <Contact active={section === 6} />
         </div>
       </div>
 
-      <Oracle />
+      <Echo />
     </ExpCtx.Provider>
   )
 }

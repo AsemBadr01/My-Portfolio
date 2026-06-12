@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
 import { useExp } from './Experience'
-import { CHAPTERS, TOUR_OFFER, CONTACT_REPLY, NAV_CONFIRMS } from '../constants/chapterData'
+import { SECTIONS, TOUR_OFFER, CONTACT_REPLY, NAV_CONFIRMS } from '../constants/sectionData'
 import { streamOracle } from '../lib/streamApi'
-import { detectNavIntent, isHireIntent, isBasmala, isMatrixEgg } from '../lib/intent'
+import { detectNavIntent, isHireIntent, isBasmala } from '../lib/intent'
 
 const OPENING =
-  "Hi! I'm Assem's AI portfolio assistant. I know everything about his work in speech recognition, deep learning, and AI systems. What would you like to know? 👋"
+  "Hey — I'm Echo 🎧 Assem's AI guide. I know his whole story: the models, Makhraj, the journey. Ask me anything, or tell me where to take you."
 
 let MID = 0
 const mkMsg = (role, content, extra = {}) => ({ id: ++MID, role, content, ...extra })
 
-export default function Oracle() {
-  const { chapter, name, goToChapter, guided, setGuided } = useExp()
+export default function Echo() {
+  const { section, name, goToSection, guided, setGuided } = useExp()
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState([mkMsg('assistant', OPENING)])
   const [input, setInput] = useState('')
@@ -27,7 +27,7 @@ export default function Oracle() {
   const narrated = useRef(new Set())
   const recRef = useRef(null)
 
-  const data = CHAPTERS[chapter - 1]
+  const data = SECTIONS[section - 1]
 
   /* ---------- helpers ---------- */
 
@@ -59,46 +59,43 @@ export default function Oracle() {
   }
 
   // Typewriter for local (non-API) replies.
-  const typeLocal = useCallback(
-    (text, { thenIdle = false } = {}) => {
-      if (typeRef.current) {
+  const typeLocal = useCallback((text, { thenIdle = false } = {}) => {
+    if (typeRef.current) {
+      clearInterval(typeRef.current)
+      typeRef.current = null
+      setMsgs((m) => m.map((x) => (x.streaming ? { ...x, streaming: false } : x)))
+    }
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const id = ++MID
+    if (reduce) {
+      setMsgs((m) => [...m, { id, role: 'assistant', content: text }])
+      scrollDown()
+      if (thenIdle) armIdleCollapse()
+      return
+    }
+    setMsgs((m) => [...m, { id, role: 'assistant', content: '', streaming: true }])
+    let i = 0
+    setBusy(true)
+    typeRef.current = setInterval(() => {
+      i += 2
+      const slice = text.slice(0, i)
+      setMsgs((m) => m.map((x) => (x.id === id ? { ...x, content: slice, streaming: i < text.length } : x)))
+      scrollDown()
+      if (i >= text.length) {
         clearInterval(typeRef.current)
         typeRef.current = null
-        setMsgs((m) => m.map((x) => (x.streaming ? { ...x, streaming: false } : x)))
-      }
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      const id = ++MID
-      if (reduce) {
-        setMsgs((m) => [...m, { id, role: 'assistant', content: text }])
-        scrollDown()
+        setBusy(false)
         if (thenIdle) armIdleCollapse()
-        return
       }
-      setMsgs((m) => [...m, { id, role: 'assistant', content: '', streaming: true }])
-      let i = 0
-      setBusy(true)
-      typeRef.current = setInterval(() => {
-        i += 2
-        const slice = text.slice(0, i)
-        setMsgs((m) => m.map((x) => (x.id === id ? { ...x, content: slice, streaming: i < text.length } : x)))
-        scrollDown()
-        if (i >= text.length) {
-          clearInterval(typeRef.current)
-          typeRef.current = null
-          setBusy(false)
-          if (thenIdle) armIdleCollapse()
-        }
-      }, 18)
-    },
-    []
-  )
+    }, 18)
+  }, [])
 
   /* ---------- first-visit tour offer ---------- */
 
   useEffect(() => {
     let prompted = true
     try {
-      prompted = !!localStorage.getItem('epoch_tour_prompted')
+      prompted = !!localStorage.getItem('echo_tour_prompted')
     } catch {}
     if (prompted) return
     const t = setTimeout(() => {
@@ -111,21 +108,21 @@ export default function Oracle() {
 
   const dismissOffer = () => {
     try {
-      localStorage.setItem('epoch_tour_prompted', '1')
+      localStorage.setItem('echo_tour_prompted', '1')
     } catch {}
     setOfferMode(false)
   }
 
   const answerOffer = (start) => {
     try {
-      localStorage.setItem('epoch_tour_prompted', '1')
+      localStorage.setItem('echo_tour_prompted', '1')
     } catch {}
     setOfferMode(false)
     if (start) {
       setGuided(true)
-      narrated.current.delete(chapter)
+      narrated.current.delete(section)
     } else {
-      typeLocal('Sounds good — explore freely. I\'m right here whenever you have a question. ✨', { thenIdle: true })
+      typeLocal("Sounds good — explore freely. I'm right here whenever you have a question. ✨", { thenIdle: true })
     }
   }
 
@@ -133,11 +130,11 @@ export default function Oracle() {
 
   useEffect(() => {
     if (!guided) return
-    if (narrated.current.has(chapter)) return
-    narrated.current.add(chapter)
+    if (narrated.current.has(section)) return
+    narrated.current.add(section)
     setOpen(true)
-    typeLocal(CHAPTERS[chapter - 1].narration, { thenIdle: true })
-  }, [chapter, guided, typeLocal])
+    typeLocal(SECTIONS[section - 1].narration, { thenIdle: true })
+  }, [section, guided, typeLocal])
 
   /* ---------- voice input ---------- */
 
@@ -150,7 +147,7 @@ export default function Oracle() {
     }
     const rec = new SR()
     recRef.current = rec
-    rec.lang = chapter === 4 ? 'ar-EG' : 'en-US'
+    rec.lang = section === 4 ? 'ar-EG' : 'en-US'
     rec.interimResults = true
     rec.continuous = false
     let final = ''
@@ -187,23 +184,17 @@ export default function Oracle() {
       typeLocal(CONTACT_REPLY)
       return
     }
-    if (isMatrixEgg(text)) {
-      window.dispatchEvent(new Event('matrix-boost'))
-      goToChapter(3)
-      typeLocal('🟢 Speed of thought. Watch the rain.')
-      return
-    }
     if (isBasmala(text)) {
-      confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 }, colors: ['#C9A84C', '#F5E6B8', '#8A6F2E'] })
+      confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 }, colors: ['#d4a843', '#f5e6b8', '#8a6f2e'] })
     }
     const navN = detectNavIntent(text)
     if (navN) {
-      goToChapter(navN)
+      goToSection(navN)
       typeLocal(NAV_CONFIRMS[navN])
       return
     }
 
-    // real Oracle call
+    // real Echo call
     setBusy(true)
     const aiId = append(mkMsg('assistant', '', { streaming: true }))
     const history = [...msgs, { role: 'user', content: text }]
@@ -211,14 +202,14 @@ export default function Oracle() {
       .slice(-10)
       .map((m, i, arr) => ({
         role: m.role,
-        content: i === arr.length - 1 ? `[visitor is on chapter ${chapter}: ${name}] ${m.content}` : m.content,
+        content: i === arr.length - 1 ? `[visitor is on section ${section}: ${name}] ${m.content}` : m.content,
       }))
 
     abortRef.current = new AbortController()
     await streamOracle(history, {
       signal: abortRef.current.signal,
       onToken: (t) => patch(aiId, (m) => ({ ...m, content: m.content + t })),
-      onNavigate: (n) => goToChapter(n),
+      onNavigate: (n) => goToSection(n),
       onBusy: (fb) => patch(aiId, (m) => ({ ...m, content: fb, streaming: false })),
       onDone: () => patch(aiId, (m) => ({ ...m, streaming: false })),
     })
@@ -244,9 +235,15 @@ export default function Oracle() {
 
   if (!open) {
     return (
-      <button className="orb orbskin" data-ch={chapter} onClick={() => setOpen(true)} aria-label="Open the Oracle chat">
+      <button
+        className="echo-orb"
+        style={{ '--accent': data.accent }}
+        onClick={() => setOpen(true)}
+        aria-label="Open Echo, the AI guide"
+      >
         <img src="/assem-avatar.webp" alt="" />
-        <span className="tip">Ask me anything</span>
+        <span className="ring" aria-hidden="true" />
+        <span className="tip">Chat with Echo</span>
       </button>
     )
   }
@@ -254,23 +251,25 @@ export default function Oracle() {
   const pills = offerMode ? ['▶ Start tour', 'Explore on my own'] : data.pills
 
   return (
-    <div className="oracle" data-ch={chapter} role="dialog" aria-label="Oracle chat">
-      <div className="o-head">
-        <img src="/assem-avatar.webp" alt="Assem" />
-        <span className="label">{data.label}</span>
+    <div className="echo" style={{ '--accent': data.accent }} role="dialog" aria-label="Echo chat">
+      <div className="e-head">
+        <img src="/assem-avatar.webp" alt="" />
+        <div className="who">
+          <b>ECHO</b>
+          <span>Assem's AI guide</span>
+        </div>
         <button className="x" onClick={close} aria-label="Close chat">✕</button>
       </div>
 
-      <div className="o-msgs" ref={scrollRef}>
+      <div className="e-msgs" ref={scrollRef}>
         {msgs.map((m) => (
           <div key={m.id} className={`msg ${m.role === 'user' ? 'user' : 'ai'}${m.streaming ? ' streaming' : ''}`} dir="auto">
-            {m.role === 'assistant' && <span className="prefix">{data.label}</span>}
             {m.content}
           </div>
         ))}
       </div>
 
-      <div className="o-pills">
+      <div className="e-pills">
         {pills.map((p) => (
           <button key={p} onClick={() => (offerMode ? answerOffer(p.startsWith('▶')) : send(p))}>
             {p}
@@ -278,7 +277,7 @@ export default function Oracle() {
         ))}
       </div>
 
-      <div className="o-input">
+      <div className="e-input">
         <input
           value={input}
           onChange={(e) => {
@@ -287,15 +286,15 @@ export default function Oracle() {
           }}
           onFocus={clearIdle}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder={chapter === 4 ? 'Ask me anything… اسألني بالعربية' : 'Ask me anything…'}
-          aria-label="Message the Oracle"
+          placeholder={section === 4 ? 'Ask about Makhraj… اسألني بالعربية' : 'Ask Echo anything…'}
+          aria-label="Message Echo"
         />
         {SR && (
           <button className={`mic${listening ? ' listening' : ''}`} onClick={toggleMic} aria-label="Voice input">
             🎙
           </button>
         )}
-        <button onClick={() => send()} disabled={busy || !input.trim()} aria-label="Send">
+        <button className="go" onClick={() => send()} disabled={busy || !input.trim()} aria-label="Send">
           ➤
         </button>
       </div>

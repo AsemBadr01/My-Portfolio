@@ -71,7 +71,7 @@ export function createSentinelParser({ onNavigate, onText }) {
       if (resolved) return onText(token)
       buf += token
       if (buf.length < 9 && '[[NAV:'.startsWith(buf.slice(0, 6))) return // still ambiguous
-      const m = buf.match(/^\[\[NAV:([1-5])\]\]\s*/)
+      const m = buf.match(/^\[\[NAV:([1-6])\]\]\s*/)
       if (m) {
         onNavigate?.(Number(m[1]))
         buf = buf.slice(m[0].length)
@@ -82,7 +82,7 @@ export function createSentinelParser({ onNavigate, onText }) {
     },
     flush() {
       if (resolved || !buf) return
-      const m = buf.match(/^\[\[NAV:([1-5])\]\]\s*/)
+      const m = buf.match(/^\[\[NAV:([1-6])\]\]\s*/)
       if (m) {
         onNavigate?.(Number(m[1]))
         buf = buf.slice(m[0].length)

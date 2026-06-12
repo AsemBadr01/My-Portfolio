@@ -1,4 +1,4 @@
-import { ORACLE_SYSTEM_PROMPT } from '../src/constants/oraclePrompt.js'
+import { ECHO_SYSTEM_PROMPT } from '../src/constants/echoPrompt.js'
 
 export const config = { runtime: 'edge' }
 
@@ -18,7 +18,7 @@ function callGroq(model, messages) {
       max_tokens: 400,
       temperature: 0.6,
       stream: true,
-      messages: [{ role: 'system', content: ORACLE_SYSTEM_PROMPT }, ...messages.slice(-10)],
+      messages: [{ role: 'system', content: ECHO_SYSTEM_PROMPT }, ...messages.slice(-10)],
     }),
   })
 }
